@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Network Optimizer Pro{% endblock %}
+{% block page_title %}📊 Connection Dashboard{% endblock %}
+
+{% block header_actions %}
+<button class="btn btn-primary" onclick="runNetworkScan()">🔄 Run Full Scan</button>
+{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+    <div class="card">
+        <h3>🌐 Connection Info</h3>
+        <div id="conn-info" class="card-body">
+            <p class="muted">Click "Run Full Scan" to start…</p>
+        </div>
+    </div>
+    <div class="card">
+        <h3>📈 Latency Overview</h3>
+        <div class="card-body">
+            <canvas id="latencyChart" height="200"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="grid-3">
+    <div class="card metric-card">
+        <span class="metric-label">Avg Latency</span>
+        <span class="metric-value" id="m-latency">—</span>
+    </div>
+    <div class="card metric-card">
+        <span class="metric-label">Download</span>
+        <span class="metric-value" id="m-download">—</span>
+    </div>
+    <div class="card metric-card">
+        <span class="metric-label">Stability</span>
+        <span class="metric-value" id="m-stability">—</span>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <h3>🔧 Network Details</h3>
+        <div id="net-details" class="card-body">
+            <p class="muted">No data yet</p>
+        </div>
+    </div>
+    <div class="card">
+        <h3>📊 Throughput</h3>
+        <div class="card-body">
+            <canvas id="throughputChart" height="200"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let latencyChart, throughputChart;
+
+async function runNetworkScan() {
+    showLoading('Running network scan…');
+    try {
+        const data = await apiPost('/api/network/scan');
+        updateDashboard(data);
+    } catch(e) {
+        alert('Scan failed: ' + e.message);
+    }
+    hideLoading();
+}
+
+function updateDashboard(data) {
+    // Connection info
+    const ci = data.connection_info || {};
+    document.getElementById('conn-info').innerHTML = `
+        <table class="info-table">
+            <tr><td>Public IP</td><td><strong>${ci.public_ip || 'N/A'}</strong></td></tr>
+            <tr><td>Local IP</td><td>${ci.local_ip || 'N/A'}</td></tr>
+            <tr><td>ISP</td><td>${ci.isp || 'N/A'}</td></tr>
+            <tr><td>Country</td><td>${ci.country || 'N/A'}</td></tr>
+            <tr><td>City</td><td>${ci.city || 'N/A'}</td></tr>
+            <tr><td>Timezone</td><td>${ci.timezone || 'N/A'}</td></tr>
+        </table>`;
+
+    // Metrics
+    const lat = data.latency || {};
+    document.getElementById('m-latency').textContent = lat.avg_ms ? lat.avg_ms + ' ms' : '—';
+    const tp = data.throughput || {};
+    document.getElementById('m-download').textContent = tp.download_mbps ? tp.download_mbps + ' Mbps' : '—';
+    document.getElementById('m-stability').textContent = data.stability_score ? data.stability_score + '%' : '—';
+
+    // Details
+    document.getElementById('net-details').innerHTML = `
+        <table class="info-table">
+            <tr><td>MTU</td><td>${data.mtu || 'N/A'}</td></tr>
+            <tr><td>NAT Type</td><td>${data.nat_type || 'N/A'}</td></tr>
+            <tr><td>TCP</td><td>${data.tcp_accessible ? '✅ OK' : '❌ Blocked'}</td></tr>
+            <tr><td>UDP</td><td>${data.udp_accessible ? '✅ OK' : '❌ Blocked'}</td></tr>
+            <tr><td>Jitter</td><td>${lat.jitter_ms || 0} ms</td></tr>
+            <tr><td>Packet Loss</td><td>${lat.packet_loss_pct || 0}%</td></tr>
+        </table>`;
+
+    // Latency chart
+    if (latencyChart) latencyChart.destroy();
+    latencyChart = new Chart(document.getElementById('latencyChart'), {
+        type: 'bar',
+        data: {
+            labels: ['Min', 'Avg', 'Max', 'Jitter'],
+            datasets: [{
+                label: 'ms',
+                data: [lat.min_ms, lat.avg_ms, lat.max_ms, lat.jitter_ms],
+                backgroundColor: ['#4caf50', '#2196f3', '#ff9800', '#f44336'],
+            }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+    });
+
+    // Throughput chart
+    if (throughputChart) throughputChart.destroy();
+    throughputChart = new Chart(document.getElementById('throughputChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Download (Mbps)', 'Upload (Mbps)'],
+            datasets: [{
+                data: [tp.download_mbps || 0, tp.upload_mbps || 0],
+                backgroundColor: ['#2196f3', '#ff9800'],
+            }]
+        },
+        options: { responsive: true }
+    });
+}
+</script>
+{% endblock %}

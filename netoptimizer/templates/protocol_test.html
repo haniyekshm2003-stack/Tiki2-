@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Protocol Benchmark - Network Optimizer Pro{% endblock %}
+{% block page_title %}🔎 Protocol Benchmark{% endblock %}
+
+{% block header_actions %}
+<button class="btn btn-primary" onclick="runProtocolBenchmark()">▶️ Run Benchmark</button>
+{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+    <div class="card">
+        <h3>📊 Protocol Performance</h3>
+        <canvas id="protoChart" height="300"></canvas>
+    </div>
+    <div class="card">
+        <h3>📊 Success Rate</h3>
+        <canvas id="protoSuccessChart" height="300"></canvas>
+    </div>
+</div>
+
+<div class="card">
+    <h3>📋 All Results</h3>
+    <div class="table-wrapper">
+        <table class="data-table sortable" id="protoTable">
+            <thead>
+                <tr>
+                    <th onclick="sortTable('protoTable',0)">Rank</th>
+                    <th onclick="sortTable('protoTable',1)">Protocol</th>
+                    <th onclick="sortTable('protoTable',2)">Avg (ms)</th>
+                    <th onclick="sortTable('protoTable',3)">Min (ms)</th>
+                    <th onclick="sortTable('protoTable',4)">Max (ms)</th>
+                    <th onclick="sortTable('protoTable',5)">Success %</th>
+                    <th>Targets</th>
+                </tr>
+            </thead>
+            <tbody id="protoTableBody"></tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let protoChart, protoSuccessChart;
+
+async function runProtocolBenchmark() {
+    showLoading('Benchmarking protocols…');
+    try {
+        const data = await apiPost('/api/protocol/benchmark');
+        renderProtocolResults(data);
+    } catch(e) { alert('Benchmark failed: ' + e.message); }
+    hideLoading();
+}
+
+function renderProtocolResults(data) {
+    const results = data.results || [];
+
+    if (protoChart) protoChart.destroy();
+    protoChart = new Chart(document.getElementById('protoChart'), {
+        type: 'bar',
+        data: {
+            labels: results.map(r => r.protocol),
+            datasets: [{
+                label: 'Avg Latency (ms)',
+                data: results.map(r => r.avg_ms < 9000 ? r.avg_ms : 0),
+                backgroundColor: '#2196f3',
+            }]
+        },
+        options: { responsive: true }
+    });
+
+    if (protoSuccessChart) protoSuccessChart.destroy();
+    protoSuccessChart = new Chart(document.getElementById('protoSuccessChart'), {
+        type: 'doughnut',
+        data: {
+            labels: results.map(r => r.protocol),
+            datasets: [{
+                data: results.map(r => r.success_rate),
+                backgroundColor: ['#4caf50','#2196f3','#ff9800','#f44336','#9c27b0','#00bcd4'],
+            }]
+        },
+        options: { responsive: true }
+    });
+
+    document.getElementById('protoTableBody').innerHTML = results.map(r => `
+        <tr>
+            <td>${r.rank}</td>
+            <td>${r.protocol}</td>
+            <td>${r.avg_ms < 9000 ? r.avg_ms : 'N/A'}</td>
+            <td>${r.min_ms < 9000 ? r.min_ms : 'N/A'}</td>
+            <td>${r.max_ms < 9000 ? r.max_ms : 'N/A'}</td>
+            <td>${r.success_rate}%</td>
+            <td>${r.targets_tested}</td>
+        </tr>
+    `).join('');
+}
+</script>
+{% endblock %}

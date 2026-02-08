@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Architecture - Network Optimizer Pro{% endblock %}
+{% block page_title %}⚙️ Service Architecture Builder{% endblock %}
+
+{% block header_actions %}
+<button class="btn btn-primary" onclick="loadArchitecture()">🔄 Generate</button>
+<button class="btn btn-secondary" onclick="loadConfig()">📄 Config Template</button>
+{% endblock %}
+
+{% block content %}
+<div class="info-banner">
+    <p>💡 Run tests first, then generate an optimised connection architecture and config template.</p>
+</div>
+
+<div id="arch-container">
+    <p class="muted">No architecture generated yet.</p>
+</div>
+
+<div id="config-container" class="hidden">
+    <div class="card">
+        <h3>📄 Configuration Template</h3>
+        <pre id="config-output" class="code-block"></pre>
+        <button class="btn btn-sm" onclick="copyConfig()">📋 Copy</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadArchitecture() {
+    showLoading('Building architecture…');
+    try {
+        const data = await apiGet('/api/architecture');
+        renderArchitecture(data);
+    } catch(e) { alert('Failed: ' + e.message); }
+    hideLoading();
+}
+
+function renderArchitecture(arch) {
+    let html = '<div class="grid-2">';
+
+    // Connection type
+    const ct = arch.connection_type || {};
+    html += buildArchCard('🔗 Connection Type', ct.type, ct.detail, ct.confidence);
+
+    // Transport
+    const tr = arch.transport || {};
+    html += buildArchCard('🚀 Transport', tr.type, tr.detail, tr.confidence);
+
+    // Encryption
+    const enc = arch.encryption || {};
+    html += buildArchCard('🔒 Encryption', enc.category, enc.detail, enc.confidence);
+
+    // Tunnel
+    const tun = arch.tunnel_category || {};
+    html += buildArchCard('🕳️ Tunnel Category', tun.category, tun.detail, tun.confidence);
+
+    html += '</div>';
+
+    // Port+Protocol combos
+    const combos = arch.port_protocol_combo || [];
+    if (combos.length) {
+        html += '<div class="card"><h3>🔌 Port + Protocol Combinations</h3><table class="data-table"><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Latency</th><th>Stability</th><th>Confidence</th></tr></thead><tbody>';
+        combos.forEach(c => {
+            html += `<tr><td>${c.port}</td><td>${c.protocol}</td><td>${c.service || ''}</td><td>${c.latency_ms || ''}ms</td><td>${c.stability || ''}%</td><td>${c.confidence}%</td></tr>`;
+        });
+        html += '</tbody></table></div>';
+    }
+
+    // Fallback plan
+    const fb = arch.fallback_plan || [];
+    if (fb.length) {
+        html += '<div class="card"><h3>🛡️ Fallback Plan</h3><ol class="fallback-list">';
+        fb.forEach(f => {
+            html += `<li><strong>${f.strategy}</strong><br><span class="muted">${f.detail}</span></li>`;
+        });
+        html += '</ol></div>';
+    }
+
+    // Server location & DNS
+    const loc = arch.server_location || {};
+    const dns = arch.dns_config || {};
+    html += `<div class="grid-2">
+        <div class="card"><h3>📍 Server Location</h3><p><strong>${loc.location || 'N/A'}</strong></p><p>Latency: ${loc.latency_ms || 'N/A'}ms | Confidence: ${loc.confidence || 'N/A'}%</p></div>
+        <div class="card"><h3>🧠 DNS Config</h3><p>Primary: <strong>${dns.primary || 'N/A'}</strong> ${dns.primary_name ? '(' + dns.primary_name + ')' : ''}</p><p>Secondary: <strong>${dns.secondary || 'N/A'}</strong> ${dns.secondary_name ? '(' + dns.secondary_name + ')' : ''}</p></div>
+    </div>`;
+
+    document.getElementById('arch-container').innerHTML = html;
+}
+
+function buildArchCard(title, value, detail, confidence) {
+    const confClass = confidence > 80 ? 'conf-high' : confidence > 50 ? 'conf-med' : 'conf-low';
+    return `<div class="card arch-card">
+        <h3>${title}</h3>
+        <div class="arch-value">${value || 'N/A'}</div>
+        <p class="muted">${detail || ''}</p>
+        <span class="confidence ${confClass}">${confidence || 0}% confidence</span>
+    </div>`;
+}
+
+async function loadConfig() {
+    showLoading('Generating config template…');
+    try {
+        const data = await apiGet('/api/config');
+        const template = data.template_config || data;
+        document.getElementById('config-output').textContent = JSON.stringify(template, null, 2);
+        document.getElementById('config-container').classList.remove('hidden');
+    } catch(e) { alert('Failed: ' + e.message); }
+    hideLoading();
+}
+
+function copyConfig() {
+    const text = document.getElementById('config-output').textContent;
+    navigator.clipboard.writeText(text).then(() => alert('Copied!'));
+}
+</script>
+{% endblock %}

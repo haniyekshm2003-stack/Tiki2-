@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}CDN Test - Network Optimizer Pro{% endblock %}
+{% block page_title %}☁️ CDN & Edge Network Test{% endblock %}
+
+{% block header_actions %}
+<button class="btn btn-primary" onclick="runCDNTest()">▶️ Run Test</button>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h3>⭐ Best CDN Providers</h3>
+    <div id="best-cdn" class="card-body"><p class="muted">Run test first</p></div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <h3>📊 Latency Comparison</h3>
+        <canvas id="cdnChart" height="300"></canvas>
+    </div>
+    <div class="card">
+        <h3>📊 Stability Scores</h3>
+        <canvas id="cdnStabilityChart" height="300"></canvas>
+    </div>
+</div>
+
+<div class="card">
+    <h3>📋 All Results</h3>
+    <div class="table-wrapper">
+        <table class="data-table sortable" id="cdnTable">
+            <thead>
+                <tr>
+                    <th onclick="sortTable('cdnTable',0)">Rank</th>
+                    <th onclick="sortTable('cdnTable',1)">CDN</th>
+                    <th onclick="sortTable('cdnTable',2)">Connect (ms)</th>
+                    <th onclick="sortTable('cdnTable',3)">Download (ms)</th>
+                    <th onclick="sortTable('cdnTable',4)">Total (ms)</th>
+                    <th onclick="sortTable('cdnTable',5)">Stability</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="cdnTableBody"></tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let cdnChart, cdnStabilityChart;
+
+async function runCDNTest() {
+    showLoading('Testing CDN edge networks…');
+    try {
+        const data = await apiPost('/api/cdn/test');
+        renderCDNResults(data);
+    } catch(e) { alert('Test failed: ' + e.message); }
+    hideLoading();
+}
+
+function renderCDNResults(data) {
+    const results = data.results || [];
+    const best = data.best_cdn || [];
+
+    // Best
+    let html = '<ol>';
+    best.forEach(c => { html += `<li><strong>${c.name}</strong> — ${c.total_ms}ms, stability: ${c.stability_score}%</li>`; });
+    html += '</ol>';
+    document.getElementById('best-cdn').innerHTML = html;
+
+    // Charts
+    const reachable = results.filter(r => r.reachable);
+    if (cdnChart) cdnChart.destroy();
+    cdnChart = new Chart(document.getElementById('cdnChart'), {
+        type: 'bar',
+        data: {
+            labels: reachable.map(r => r.name),
+            datasets: [
+                { label: 'Connect (ms)', data: reachable.map(r => r.connect_ms), backgroundColor: '#2196f3' },
+                { label: 'Download (ms)', data: reachable.map(r => r.download_ms), backgroundColor: '#ff9800' },
+            ]
+        },
+        options: { responsive: true }
+    });
+
+    if (cdnStabilityChart) cdnStabilityChart.destroy();
+    cdnStabilityChart = new Chart(document.getElementById('cdnStabilityChart'), {
+        type: 'radar',
+        data: {
+            labels: reachable.map(r => r.name),
+            datasets: [{
+                label: 'Stability %',
+                data: reachable.map(r => r.stability_score),
+                borderColor: '#4caf50',
+                backgroundColor: 'rgba(76,175,80,0.2)',
+            }]
+        },
+        options: { responsive: true, scales: { r: { beginAtZero: true, max: 100 } } }
+    });
+
+    // Table
+    document.getElementById('cdnTableBody').innerHTML = results.map(r => `
+        <tr>
+            <td>${r.rank}</td>
+            <td>${r.name}</td>
+            <td>${r.connect_ms}</td>
+            <td>${r.download_ms}</td>
+            <td>${r.total_ms}</td>
+            <td>${r.stability_score}%</td>
+            <td>${r.reachable ? '✅' : '❌'}</td>
+        </tr>
+    `).join('');
+}
+</script>
+{% endblock %}

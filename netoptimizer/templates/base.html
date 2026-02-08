@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Network Optimizer Pro{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="logo">
+            <h2>🌐 NetOptimizer</h2>
+            <span class="version">v1.0</span>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/" class="{% if request.path == '/' %}active{% endif %}">📊 Dashboard</a></li>
+            <li><a href="/ping" class="{% if request.path == '/ping' %}active{% endif %}">📍 Ping Test</a></li>
+            <li><a href="/dns" class="{% if request.path == '/dns' %}active{% endif %}">🧠 DNS Analysis</a></li>
+            <li><a href="/cdn" class="{% if request.path == '/cdn' %}active{% endif %}">☁️ CDN Test</a></li>
+            <li><a href="/protocol" class="{% if request.path == '/protocol' %}active{% endif %}">🔎 Protocols</a></li>
+            <li><a href="/ports" class="{% if request.path == '/ports' %}active{% endif %}">🔐 Port Scan</a></li>
+            <li><a href="/recommendations" class="{% if request.path == '/recommendations' %}active{% endif %}">🧠 Recommendations</a></li>
+            <li><a href="/architecture" class="{% if request.path == '/architecture' %}active{% endif %}">⚙️ Architecture</a></li>
+            <li><a href="/report" class="{% if request.path == '/report' %}active{% endif %}">📋 Report</a></li>
+        </ul>
+        <div class="nav-footer">
+            <label class="toggle-label">
+                <input type="checkbox" id="restrictedMode" onchange="toggleRestricted()">
+                🛡️ Restricted Mode
+            </label>
+        </div>
+    </nav>
+
+    <main class="content">
+        <header class="page-header">
+            <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+            <div class="header-actions">
+                {% block header_actions %}{% endblock %}
+            </div>
+        </header>
+        <div class="page-body">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+        <p id="loading-text">Running tests…</p>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
