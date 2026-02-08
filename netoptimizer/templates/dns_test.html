@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}DNS Analysis - Network Optimizer Pro{% endblock %}
+{% block page_title %}🧠 DNS Analysis{% endblock %}
+
+{% block header_actions %}
+<button class="btn btn-primary" onclick="runDNSBenchmark()">▶️ Run Benchmark</button>
+{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+    <div class="card">
+        <h3>⭐ Best DNS Servers</h3>
+        <div id="best-dns" class="card-body"><p class="muted">Run benchmark first</p></div>
+    </div>
+    <div class="card">
+        <h3>➕ Test Custom DNS</h3>
+        <div class="card-body">
+            <div class="form-row">
+                <input type="text" id="customDNSName" placeholder="Name (e.g. My DNS)">
+                <input type="text" id="customDNSIP" placeholder="IP (e.g. 1.2.3.4)">
+                <button class="btn btn-sm" onclick="testCustomDNS()">Test</button>
+            </div>
+            <div id="custom-dns-result"></div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h3>📊 Response Time Comparison</h3>
+    <canvas id="dnsChart" height="300"></canvas>
+</div>
+
+<div class="card">
+    <h3>📋 All Results</h3>
+    <div class="table-wrapper">
+        <table class="data-table sortable" id="dnsTable">
+            <thead>
+                <tr>
+                    <th onclick="sortTable('dnsTable',0)">Rank</th>
+                    <th onclick="sortTable('dnsTable',1)">Name</th>
+                    <th onclick="sortTable('dnsTable',2)">IP</th>
+                    <th onclick="sortTable('dnsTable',3)">Avg (ms)</th>
+                    <th onclick="sortTable('dnsTable',4)">Min (ms)</th>
+                    <th onclick="sortTable('dnsTable',5)">Max (ms)</th>
+                    <th onclick="sortTable('dnsTable',6)">Reliability</th>
+                    <th onclick="sortTable('dnsTable',7)">Errors</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="dnsTableBody"></tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let dnsChart;
+
+async function runDNSBenchmark() {
+    showLoading('Benchmarking DNS servers…');
+    try {
+        const data = await apiPost('/api/dns/benchmark');
+        renderDNSResults(data);
+    } catch(e) { alert('Benchmark failed: ' + e.message); }
+    hideLoading();
+}
+
+function renderDNSResults(data) {
+    const results = data.results || [];
+    const best = data.best_dns || [];
+
+    // Best DNS
+    let html = '<ol>';
+    best.forEach(d => { html += `<li><strong>${d.name}</strong> (${d.ip}) — ${d.avg_ms}ms, ${d.reliability_pct}% reliable</li>`; });
+    html += '</ol>';
+    document.getElementById('best-dns').innerHTML = html;
+
+    // Chart
+    if (dnsChart) dnsChart.destroy();
+    const reachable = results.filter(r => r.reachable);
+    dnsChart = new Chart(document.getElementById('dnsChart'), {
+        type: 'bar',
+        data: {
+            labels: reachable.map(r => r.name),
+            datasets: [{
+                label: 'Avg Response (ms)',
+                data: reachable.map(r => r.avg_ms),
+                backgroundColor: reachable.map((r, i) => i < 3 ? '#4caf50' : '#2196f3'),
+            }]
+        },
+        options: { responsive: true, indexAxis: 'y' }
+    });
+
+    // Table
+    document.getElementById('dnsTableBody').innerHTML = results.map(r => `
+        <tr>
+            <td>${r.rank}</td>
+            <td>${r.name}</td>
+            <td>${r.ip}</td>
+            <td>${r.avg_ms}</td>
+            <td>${r.min_ms}</td>
+            <td>${r.max_ms}</td>
+            <td>${r.reliability_pct}%</td>
+            <td>${r.error_count}</td>
+            <td>${r.reachable ? '✅' : '❌'}</td>
+        </tr>
+    `).join('');
+}
+
+async function testCustomDNS() {
+    const name = document.getElementById('customDNSName').value || 'Custom';
+    const ip = document.getElementById('customDNSIP').value;
+    if (!ip) { alert('Enter DNS IP'); return; }
+    showLoading('Testing custom DNS…');
+    try {
+        const result = await apiPost('/api/dns/custom', { name, ip });
+        document.getElementById('custom-dns-result').innerHTML = `
+            <div class="result-box">
+                <strong>${result.name}</strong> (${result.ip})<br>
+                Avg: ${result.avg_ms}ms | Reliability: ${result.reliability_pct}% |
+                ${result.reachable ? '✅ Reachable' : '❌ Unreachable'}
+            </div>`;
+    } catch(e) { alert('Test failed: ' + e.message); }
+    hideLoading();
+}
+</script>
+{% endblock %}

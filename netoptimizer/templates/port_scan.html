@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Port Scan - Network Optimizer Pro{% endblock %}
+{% block page_title %}🔐 Port Reachability Scan{% endblock %}
+
+{% block header_actions %}
+<button class="btn btn-primary" onclick="runPortScan()">▶️ Run Scan</button>
+{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+    <div class="card">
+        <h3>✅ Reachable Ports</h3>
+        <div id="reachable-ports" class="card-body"><p class="muted">Run scan first</p></div>
+    </div>
+    <div class="card">
+        <h3>📊 Port Status</h3>
+        <canvas id="portChart" height="250"></canvas>
+    </div>
+</div>
+
+<div class="card">
+    <h3>📋 All Results</h3>
+    <div class="table-controls">
+        <input type="text" id="portFilter" placeholder="Filter by port or service…" oninput="filterPortTable()">
+    </div>
+    <div class="table-wrapper">
+        <table class="data-table sortable" id="portTable">
+            <thead>
+                <tr>
+                    <th onclick="sortTable('portTable',0)">Rank</th>
+                    <th onclick="sortTable('portTable',1)">Port</th>
+                    <th onclick="sortTable('portTable',2)">Service</th>
+                    <th onclick="sortTable('portTable',3)">Protocol</th>
+                    <th onclick="sortTable('portTable',4)">Latency (ms)</th>
+                    <th onclick="sortTable('portTable',5)">Stability</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="portTableBody"></tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let portData = [];
+let portChart;
+
+async function runPortScan() {
+    showLoading('Scanning ports (safe mode)…');
+    try {
+        const data = await apiPost('/api/ports/scan');
+        portData = data.results || [];
+        renderPortResults(data);
+    } catch(e) { alert('Scan failed: ' + e.message); }
+    hideLoading();
+}
+
+function renderPortResults(data) {
+    const results = data.results || [];
+    const reachable = data.reachable || [];
+
+    // Reachable summary
+    let html = '<div class="tag-list">';
+    reachable.forEach(p => { html += `<span class="tag tag-green">${p.port} (${p.service})</span>`; });
+    html += '</div>';
+    document.getElementById('reachable-ports').innerHTML = html;
+
+    // Chart
+    const open = results.filter(r => r.reachable).length;
+    const closed = results.length - open;
+    if (portChart) portChart.destroy();
+    portChart = new Chart(document.getElementById('portChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Reachable', 'Blocked'],
+            datasets: [{ data: [open, closed], backgroundColor: ['#4caf50', '#f44336'] }]
+        },
+        options: { responsive: true }
+    });
+
+    renderPortTable(results);
+}
+
+function renderPortTable(results) {
+    document.getElementById('portTableBody').innerHTML = results.map(r => `
+        <tr class="${r.reachable ? '' : 'row-muted'}">
+            <td>${r.rank}</td>
+            <td>${r.port}</td>
+            <td>${r.service}</td>
+            <td>${r.protocol}</td>
+            <td>${r.reachable ? r.avg_ms : 'N/A'}</td>
+            <td>${r.reachable ? r.stability_score + '%' : 'N/A'}</td>
+            <td>${r.reachable ? '✅ Open' : '❌ Blocked'}</td>
+        </tr>
+    `).join('');
+}
+
+function filterPortTable() {
+    const q = document.getElementById('portFilter').value.toLowerCase();
+    const filtered = portData.filter(r =>
+        String(r.port).includes(q) || r.service.toLowerCase().includes(q)
+    );
+    renderPortTable(filtered);
+}
+</script>
+{% endblock %}

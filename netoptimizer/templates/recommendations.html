@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Recommendations - Network Optimizer Pro{% endblock %}
+{% block page_title %}🧠 Smart Recommendations{% endblock %}
+
+{% block header_actions %}
+<button class="btn btn-primary" onclick="loadRecommendations()">🔄 Generate</button>
+{% endblock %}
+
+{% block content %}
+<div class="info-banner">
+    <p>💡 Run tests from other pages first, then generate recommendations based on collected data.</p>
+</div>
+
+<div id="rec-container">
+    <p class="muted">No recommendations yet. Run tests and click Generate.</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadRecommendations() {
+    showLoading('Generating recommendations…');
+    try {
+        const data = await apiGet('/api/recommendations');
+        renderRecommendations(data.recommendations || []);
+    } catch(e) { alert('Failed: ' + e.message); }
+    hideLoading();
+}
+
+function renderRecommendations(recs) {
+    if (!recs.length) {
+        document.getElementById('rec-container').innerHTML = '<p class="muted">No data available. Run tests first.</p>';
+        return;
+    }
+
+    // Group by category
+    const groups = {};
+    recs.forEach(r => {
+        if (!groups[r.category]) groups[r.category] = [];
+        groups[r.category].push(r);
+    });
+
+    let html = '';
+    for (const [cat, items] of Object.entries(groups)) {
+        html += `<div class="card rec-card">
+            <h3>${getCategoryIcon(cat)} ${cat}</h3>
+            <div class="rec-list">`;
+        items.forEach(r => {
+            const confClass = r.confidence > 80 ? 'conf-high' : r.confidence > 50 ? 'conf-med' : 'conf-low';
+            html += `
+                <div class="rec-item">
+                    <div class="rec-header">
+                        <strong>${r.title}</strong>
+                        <span class="confidence ${confClass}">${r.confidence}% confidence</span>
+                    </div>
+                    <div class="rec-value">${r.value}</div>
+                    <div class="rec-detail">${r.detail}</div>
+                </div>`;
+        });
+        html += '</div></div>';
+    }
+    document.getElementById('rec-container').innerHTML = html;
+}
+
+function getCategoryIcon(cat) {
+    const icons = { Location: '📍', DNS: '🧠', CDN: '☁️', Protocol: '🔎', Ports: '🔐', Network: '🌐' };
+    return icons[cat] || '📋';
+}
+</script>
+{% endblock %}

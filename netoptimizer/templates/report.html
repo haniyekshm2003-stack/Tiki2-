@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Report - Network Optimizer Pro{% endblock %}
+{% block page_title %}📋 Full Report{% endblock %}
+
+{% block header_actions %}
+<button class="btn btn-primary" onclick="loadReport()">🔄 Load Report</button>
+<button class="btn btn-secondary" onclick="exportReport()">💾 Export JSON</button>
+{% endblock %}
+
+{% block content %}
+<div class="info-banner">
+    <p>💡 Run all tests from other pages, then load the comprehensive report here.</p>
+</div>
+
+<div id="report-container">
+    <p class="muted">No report data available. Run tests first.</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadReport() {
+    showLoading('Loading report…');
+    try {
+        const data = await apiGet('/api/report');
+        renderReport(data);
+    } catch(e) { alert('Failed: ' + e.message); }
+    hideLoading();
+}
+
+function renderReport(data) {
+    let html = '';
+
+    // Network
+    if (data.network) {
+        const n = data.network;
+        const ci = n.connection_info || {};
+        html += `<div class="card"><h3>🌐 Network Overview</h3>
+            <div class="grid-3">
+                <div class="metric-card"><span class="metric-label">Public IP</span><span class="metric-value">${ci.public_ip || 'N/A'}</span></div>
+                <div class="metric-card"><span class="metric-label">ISP</span><span class="metric-value">${ci.isp || 'N/A'}</span></div>
+                <div class="metric-card"><span class="metric-label">Location</span><span class="metric-value">${ci.city || ''}, ${ci.country || ''}</span></div>
+                <div class="metric-card"><span class="metric-label">Latency</span><span class="metric-value">${(n.latency||{}).avg_ms || 'N/A'} ms</span></div>
+                <div class="metric-card"><span class="metric-label">Download</span><span class="metric-value">${(n.throughput||{}).download_mbps || 'N/A'} Mbps</span></div>
+                <div class="metric-card"><span class="metric-label">Stability</span><span class="metric-value">${n.stability_score || 'N/A'}%</span></div>
+            </div>
+        </div>`;
+    }
+
+    // Ping
+    if (data.ping) {
+        const best = (data.ping.best_locations || []).slice(0, 5);
+        html += `<div class="card"><h3>📍 Best Ping Locations</h3><ol>`;
+        best.forEach(b => { html += `<li>${b.city}, ${b.country} — ${b.avg_ms}ms</li>`; });
+        html += '</ol></div>';
+    }
+
+    // DNS
+    if (data.dns) {
+        const best = (data.dns.best_dns || []).slice(0, 3);
+        html += `<div class="card"><h3>🧠 Best DNS Servers</h3><ol>`;
+        best.forEach(d => { html += `<li>${d.name} (${d.ip}) — ${d.avg_ms}ms, ${d.reliability_pct}%</li>`; });
+        html += '</ol></div>';
+    }
+
+    // CDN
+    if (data.cdn) {
+        const best = (data.cdn.best_cdn || []).slice(0, 3);
+        html += `<div class="card"><h3>☁️ Best CDN</h3><ol>`;
+        best.forEach(c => { html += `<li>${c.name} — ${c.total_ms}ms</li>`; });
+        html += '</ol></div>';
+    }
+
+    // Recommendations
+    if (data.recommendations && data.recommendations.length) {
+        html += `<div class="card"><h3>🧠 Key Recommendations</h3><ul>`;
+        data.recommendations.forEach(r => {
+            html += `<li><strong>${r.title}:</strong> ${r.value} <span class="muted">(${r.confidence}% confidence)</span></li>`;
+        });
+        html += '</ul></div>';
+    }
+
+    if (!html) {
+        html = '<p class="muted">No test data available. Run tests from other pages first.</p>';
+    }
+
+    document.getElementById('report-container').innerHTML = html;
+}
+
+function exportReport() {
+    window.open('/api/report/export', '_blank');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Ping Test - Network Optimizer Pro{% endblock %}
+{% block page_title %}📍 Global Ping Test{% endblock %}
+
+{% block header_actions %}
+<button class="btn btn-primary" onclick="runPingTest()">▶️ Start Test</button>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h3>🌍 Region Summary</h3>
+    <div id="region-summary" class="card-body"><p class="muted">Run test to see results</p></div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <h3>📊 Latency by Region</h3>
+        <canvas id="regionChart" height="250"></canvas>
+    </div>
+    <div class="card">
+        <h3>⭐ Best Locations</h3>
+        <div id="best-locations" class="card-body"><p class="muted">No data</p></div>
+    </div>
+</div>
+
+<div class="card">
+    <h3>📋 All Results</h3>
+    <div class="table-controls">
+        <input type="text" id="pingFilter" placeholder="Filter…" oninput="filterPingTable()">
+    </div>
+    <div class="table-wrapper">
+        <table class="data-table sortable" id="pingTable">
+            <thead>
+                <tr>
+                    <th onclick="sortTable('pingTable',0)">Rank</th>
+                    <th onclick="sortTable('pingTable',1)">Country</th>
+                    <th onclick="sortTable('pingTable',2)">City</th>
+                    <th onclick="sortTable('pingTable',3)">Region</th>
+                    <th onclick="sortTable('pingTable',4)">Avg (ms)</th>
+                    <th onclick="sortTable('pingTable',5)">Min (ms)</th>
+                    <th onclick="sortTable('pingTable',6)">Jitter</th>
+                    <th onclick="sortTable('pingTable',7)">Loss %</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="pingTableBody"></tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let pingData = [];
+let regionChart;
+
+async function runPingTest() {
+    showLoading('Testing latency to global servers…');
+    try {
+        const data = await apiPost('/api/ping/test');
+        pingData = data.results || [];
+        renderPingResults(data);
+    } catch(e) { alert('Test failed: ' + e.message); }
+    hideLoading();
+}
+
+function renderPingResults(data) {
+    // Region summary
+    const regions = data.region_summary || [];
+    let html = '<table class="data-table"><thead><tr><th>Region</th><th>Avg ms</th><th>Best ms</th><th>Endpoints</th></tr></thead><tbody>';
+    regions.forEach(r => {
+        html += `<tr><td>${r.region}</td><td>${r.avg_ms}</td><td>${r.best_ms}</td><td>${r.endpoints_tested}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    document.getElementById('region-summary').innerHTML = html;
+
+    // Best locations
+    const best = data.best_locations || [];
+    let bhtml = '<ol>';
+    best.forEach(b => { bhtml += `<li><strong>${b.city}, ${b.country}</strong> — ${b.avg_ms}ms</li>`; });
+    bhtml += '</ol>';
+    document.getElementById('best-locations').innerHTML = bhtml;
+
+    // Chart
+    if (regionChart) regionChart.destroy();
+    regionChart = new Chart(document.getElementById('regionChart'), {
+        type: 'bar',
+        data: {
+            labels: regions.map(r => r.region),
+            datasets: [{
+                label: 'Avg Latency (ms)',
+                data: regions.map(r => r.avg_ms),
+                backgroundColor: '#2196f3',
+            }]
+        },
+        options: { responsive: true, indexAxis: 'y' }
+    });
+
+    // Table
+    renderPingTable(pingData);
+}
+
+function renderPingTable(results) {
+    const tbody = document.getElementById('pingTableBody');
+    tbody.innerHTML = results.map(r => `
+        <tr>
+            <td>${r.rank}</td>
+            <td>${r.country}</td>
+            <td>${r.city}</td>
+            <td>${r.region}</td>
+            <td>${r.avg_ms}</td>
+            <td>${r.min_ms}</td>
+            <td>${r.jitter_ms}</td>
+            <td>${r.packet_loss_pct}</td>
+            <td>${r.reachable ? '✅' : '❌'}</td>
+        </tr>
+    `).join('');
+}
+
+function filterPingTable() {
+    const q = document.getElementById('pingFilter').value.toLowerCase();
+    const filtered = pingData.filter(r =>
+        r.country.toLowerCase().includes(q) ||
+        r.city.toLowerCase().includes(q) ||
+        r.region.toLowerCase().includes(q) ||
+        r.host.toLowerCase().includes(q)
+    );
+    renderPingTable(filtered);
+}
+</script>
+{% endblock %}
