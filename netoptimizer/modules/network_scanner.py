@@ -223,7 +223,7 @@ class NetworkScanner:
                 try:
                     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                     s.settimeout(2)
-                    s.bind(("", port))
+                    s.bind((local_ip, port))
                     s.close()
                     ports_ok += 1
                 except Exception:

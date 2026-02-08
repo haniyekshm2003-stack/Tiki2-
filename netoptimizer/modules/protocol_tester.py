@@ -161,6 +161,7 @@ class ProtocolTester:
     def _test_tls(self, target: dict) -> tuple[list[float], int]:
         times, failures = [], 0
         ctx = ssl.create_default_context()
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         for _ in range(self.SAMPLES):
             try:
                 start = time.perf_counter()
